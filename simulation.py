@@ -19,11 +19,9 @@ def getMeasOps(impl='1'):
     else:
         return "Wrong input for implementation"
 
-def measure(state, eff=1, impl='1'):
+def measure(p, eff=1, impl='1'):
     if impl == '1':
-        MeasOps = getMeasOps(impl)
-        prob = abs((state.dag() * MeasOps * state).real)
-        if np.random.rand() < prob:
+        if np.random.rand() < p:
             if np.random.rand() < eff:
                 return 1
             else:
@@ -32,9 +30,9 @@ def measure(state, eff=1, impl='1'):
             return 2
         
     elif impl == '2':
-        MeasOps = getMeasOps(impl)
-        p0 = abs((state.dag() * MeasOps[0] * state).real)
-        p1 = abs((state.dag() * MeasOps[1] * state).real)
+
+        p0 = p[0]
+        p1 = p[1]
 
         r = np.random.rand() #for measurement
         reff = np.random.rand() #for efficiency
@@ -89,9 +87,20 @@ def doSimul(alpha, px1, impl='1', nPoints=100000, eff=1):
     if impl == '1':
         psi0 = qt.coherent(N, 0)
         psi1 = qt.coherent(N, alpha)
+        MeasOps = getMeasOps(impl)
+        prob0 = abs((psi0.dag() * MeasOps * psi0).real)
+        prob1 = abs((psi1.dag() * MeasOps * psi1).real)
+        p = [prob0, prob1]
     elif impl == '2':
         psi0 = qt.tensor(qt.coherent(N, alpha), qt.coherent(N, 0))
         psi1 = qt.tensor(qt.coherent(N, 0), qt.coherent(N,alpha))
+        MeasOps = getMeasOps(impl)
+        p00 = abs((psi0.dag() * MeasOps[0] * psi0).real)
+        p10 = abs((psi0.dag() * MeasOps[1] * psi0).real)
+        p01 = abs((psi1.dag() * MeasOps[0] * psi1).real)
+        p11 = abs((psi1.dag() * MeasOps[1] * psi1).real)
+        p = [(p00, p10), (p01, p11)]
+
     else:
         return "Wrong implementation number"
 
@@ -102,10 +111,10 @@ def doSimul(alpha, px1, impl='1', nPoints=100000, eff=1):
     for _ in range(nPoints):
         x = pick_x(px1)
         if x:
-            b = measure(psi1, eff, impl)
+            b = measure(p[1], eff, impl)
             data.append((b,x))
         else:
-            b = measure(psi0, eff, impl)
+            b = measure(p[0], eff, impl)
             data.append((b,x))
 
     probs = get_stat(data)
