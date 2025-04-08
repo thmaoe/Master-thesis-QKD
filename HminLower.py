@@ -38,11 +38,9 @@ def getHmin(p, delta, px): ##this works only for implementation 1
 
     obj = cp.real((muinc0 * p[2][0] + muinc1 * p[2][1] + mu10 * p[1][0] + mu11 * p[1][1] + mu01 * p[0][1] + mu00 * p[0][0]))
                     # cp.abs(muinc0) * t(10**(-9), Ninc_0+N1_0) - cp.abs(muinc1) * t(10**(-9), Ninc_1+N1_1) - cp.abs(mu10) * t(10**(-9), Ninc_0+N1_0) - 
-                    # cp.abs(mu11) * t(10**(-9), Ninc_1+N1_1)))
+                    # cp.abs(mu11) * t(10**(-9), Ninc_1+N1_1))
 
     prob = cp.Problem(cp.Minimize(obj), constraints)
     prob.solve(solver = "MOSEK")
-
-    # print(prob.value)
 
     return -np.log2(prob.value)

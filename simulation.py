@@ -5,7 +5,7 @@ from math import sqrt
 import numpy as np
 
 def getMeasOps(impl='1'):
-    N=10 #truncation of fock space
+    N=20 #truncation of fock space
 
     if impl == '1':
         M = qt.qeye(N) - qt.fock(N,0) * qt.fock(N,0).dag()
@@ -60,17 +60,18 @@ def pick_x(px1):
     else:
         return 0
 
-def get_stat(data): ##Data is a list of (b,x) tuples with b=2 with b was inconclusive
-    # Initialize count dictionaries
+
+def get_stat(data, deadtime=False):
+    td = 34e-9  # detector dead time in seconds
+    pulse_rate = 50e6  # 50 MHz as in paper
+
     counts = {0: {0: 0, 1: 0}, 1: {0: 0, 1: 0}, 2: {0: 0, 1: 0}}
     total = {0: 0, 1: 0}
 
-    # Count occurrences
     for b, x in data:
         counts[b][x] += 1
         total[x] += 1
 
-    # Compute probabilities, avoiding division by zero
     p = {
         b: {
             x: (counts[b][x] / total[x]) if total[x] > 0 else 0
@@ -79,11 +80,34 @@ def get_stat(data): ##Data is a list of (b,x) tuples with b=2 with b was inconcl
         for b in (0, 1, 2)
     }
 
+    if deadtime:
+        for x in (0, 1):
+            N_total = total[x]
+            N_click = counts[0][x] + counts[1][x]
+
+            if N_total == 0:
+                continue
+
+            click_rate = (N_click / N_total) * pulse_rate
+
+            cd = 1 / (1 + td * click_rate)
+
+            p0x = p[0][x] * cd
+            p1x = p[1][x] * cd
+            p2x = 1 - (p0x + p1x)  # normalize
+
+            p[0][x] = p0x
+            p[1][x] = p1x
+            p[2][x] = p2x
+
     return p, counts
 
-def doSimul(alpha, px1, impl='1', nPoints=100000, eff=1):
 
-    N=10 #Fock space truncation
+
+
+def doSimul(alpha, px1, impl='1', nPoints=100000, eff=1, deadtime=False):
+
+    N=20 #Fock space truncation
     if impl == '1':
         psi0 = qt.coherent(N, 0)
         psi1 = qt.coherent(N, alpha)
@@ -108,16 +132,22 @@ def doSimul(alpha, px1, impl='1', nPoints=100000, eff=1):
 
     data = []
 
+    Ndet = 0
+
     for _ in range(nPoints):
         x = pick_x(px1)
         if x:
             b = measure(p[1], eff, impl)
+            if not b==2:
+                Ndet += 1
             data.append((b,x))
         else:
             b = measure(p[0], eff, impl)
+            if not b==2:
+                Ndet += 1
             data.append((b,x))
 
-    probs = get_stat(data)
+    probs = get_stat(data, deadtime)
     
     return delta, probs
 
