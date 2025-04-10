@@ -36,11 +36,16 @@ def getHmin(p, delta, px): ##this works only for implementation 1
     constraints += [(rho0 * ((1-px) - mu10) - rho1 * (mu11) + H10 - 0.5*cp.trace(H10)*np.eye(2)) << 0]
     constraints += [(rho0 * ((1-px) - mu10) + rho1 * (px - mu11) + H11 - 0.5*cp.trace(H11)*np.eye(2)) << 0]
 
+
     obj = cp.real((muinc0 * p[2][0] + muinc1 * p[2][1] + mu10 * p[1][0] + mu11 * p[1][1] + mu01 * p[0][1] + mu00 * p[0][0]))
                     # cp.abs(muinc0) * t(10**(-9), Ninc_0+N1_0) - cp.abs(muinc1) * t(10**(-9), Ninc_1+N1_1) - cp.abs(mu10) * t(10**(-9), Ninc_0+N1_0) - 
                     # cp.abs(mu11) * t(10**(-9), Ninc_1+N1_1))
 
+    # reg = 1e-8 * (cp.square(mu00) + cp.square(mu01) + cp.square(mu10) + cp.square(mu11) + cp.square(muinc0) + cp.square(muinc1)) ## for stabilization bc around some value it tends to bug. THIS is bc of finite size effects with perfect detector which lead to non physical probabilities !!!!
+    obj = cp.real(obj)
+
     prob = cp.Problem(cp.Minimize(obj), constraints)
     prob.solve(solver = "MOSEK")
+
 
     return -np.log2(prob.value)
