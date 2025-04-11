@@ -279,6 +279,9 @@ def runOpti(delta, p, px, method='Faster', impl = 0):
             return getHFaster(m, xs, bs, p, rho, w, t, px)
         else:
             return getH(m, xs, bs, p, rho, w, t, px)
+        
+
+
     else:
         a = np.abs((delta[1]+delta[2])/np.sqrt(2.0*(1.0+delta[0])))**2.0 + np.abs((delta[1]-delta[2])/np.sqrt(2.0*(1.0-delta[0])))**2.0
         if a >= 1.0:

@@ -190,17 +190,23 @@ def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False):
         psi0 = qt.coherent(N, 0)
         psi1 = qt.coherent(N, alpha)
         MeasOps = getMeasOps(impl)
-        prob0 = abs((psi0.dag() * MeasOps * psi0).real)
-        prob1 = abs((psi1.dag() * MeasOps * psi1).real)
+        # prob0 = abs((psi0.dag() * MeasOps * psi0).real)
+        # prob1 = abs((psi1.dag() * MeasOps * psi1).real)
+        prob0 = 0
+        prob1 = 1 - np.exp(-alpha**2)
         p = [prob0, prob1]
     elif impl == '2':
         psi0 = qt.tensor(qt.coherent(N, alpha), qt.coherent(N, 0))
         psi1 = qt.tensor(qt.coherent(N, 0), qt.coherent(N,alpha))
         MeasOps = getMeasOps(impl)
-        p00 = abs((psi0.dag() * MeasOps[0] * psi0).real)
-        p10 = abs((psi0.dag() * MeasOps[1] * psi0).real)
-        p01 = abs((psi1.dag() * MeasOps[0] * psi1).real)
-        p11 = abs((psi1.dag() * MeasOps[1] * psi1).real)
+        # p00 = abs((psi0.dag() * MeasOps[0] * psi0).real)
+        # p10 = abs((psi0.dag() * MeasOps[1] * psi0).real)
+        # p01 = abs((psi1.dag() * MeasOps[0] * psi1).real)
+        # p11 = abs((psi1.dag() * MeasOps[1] * psi1).real)
+        p00 = 1 - np.exp(-alpha**2)
+        p10 = 0
+        p01 = 0
+        p11 = 1 - np.exp(-alpha**2)
         p = [(p00, p10), (p01, p11)]
     elif impl == '3':
         psi0 = qt.tensor(qt.coherent(N, alpha[0]), qt.coherent(N, 0))
@@ -224,7 +230,11 @@ def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False):
     
     if impl == '1' or impl == '2':
 
-        delta = abs((psi0.dag() * psi1)) #overlap
+        # delta = abs((psi0.dag() * psi1)) #overlap
+        if impl == '1' : 
+            delta = np.exp(-alpha**2/2)
+        else: 
+            delta = np.exp(-alpha**2)
 
         data = []
 
