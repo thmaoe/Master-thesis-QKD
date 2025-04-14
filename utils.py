@@ -25,4 +25,3 @@ def handle_non_phys(p, alpha, impl = '1'): ##Handling non physical probas which 
             p[0][0][0] = 1 - (p_+1e-3)
 
         return p
-    

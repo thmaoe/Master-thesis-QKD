@@ -164,7 +164,7 @@ def getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs, impl=0):
         for b in range(bs):
             for x in range(xs):
                 pred = cp.real(cp.trace(Mbs[b] @ rho[x]))
-                constraints += [pred >= p[b][x] - 1e-6, pred <= p[b][x] + 1e-6]
+                constraints += [pred >= p[b][x] - 1e-4, pred <= p[b][x] + 1e-4]
         
         return constraints
 
