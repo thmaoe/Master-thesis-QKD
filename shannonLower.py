@@ -112,7 +112,7 @@ def getConstraints(Mbs, Xis, Thetas, rho, p, xs, bs, m):
     return constraints
 
 def getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs, impl=0): 
-    if not impl:
+    if impl == 0:
         constraints = []
 
         sumb_m = 0.0
@@ -122,15 +122,15 @@ def getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs, impl=0):
                 sumb_xi = 0.0
                 sumb_theta = 0.0
                 for bb in range(bs):
-                    G = cp.bmat([[Mbs[b],           Xis[b][x][bb]], 
-                                [Xis[b][x][bb], Thetas[b][x][bb]]])
-                    constraints += [G >> 0]
+                    G = cp.bmat([[Mbs[bb],           Xis[bb][x][b]], 
+                                [Xis[bb][x][b], Thetas[bb][x][b]]])
+                    constraints += [G >> 0.0] 
 
-                    sumb_xi += Xis[b][x][bb]
-                    sumb_theta += Thetas[b][x][bb]
+                    sumb_xi += Xis[bb][x][b]
+                    sumb_theta += Thetas[bb][x][b]
                 
-                constraints += [sumb_xi == 1/2 * cp.trace(sumb_xi) * np.eye(2)]
-                constraints += [sumb_theta == 1/2 * cp.trace(sumb_theta) * np.eye(2)]
+                constraints += [sumb_xi == cp.trace(sumb_xi) * np.eye(2) / float(2)]
+                constraints += [sumb_theta == cp.trace(sumb_theta) * np.eye(2) / float(2)]
                 
         constraints += [sumb_m == np.eye(2)]
 
@@ -144,27 +144,25 @@ def getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs, impl=0):
         constraints = []
 
         sumb_m = 0.0
-        for b in range(bs):
-            sumb_m += Mbs[b]
+        for bb in range(bs):
+            sumb_m += Mbs[bb]
             sumb_xi = 0.0
             sumb_theta = 0.0
-            for bb in range(bs):
-                G = cp.bmat([[Mbs[b],           Xis[b][bb]], 
-                            [Xis[b][bb], Thetas[b][bb]]])
-                constraints += [G >> 0]
-
+            for b in range(bs):
                 sumb_xi += Xis[b][bb]
                 sumb_theta += Thetas[b][bb]
-            
-            constraints += [sumb_xi == 1/3 * cp.trace(sumb_xi) * np.eye(3)]
-            constraints += [sumb_theta == 1/3 * cp.trace(sumb_theta) * np.eye(3)]
-                
-        constraints += [sumb_m == np.eye(3)]
+                G = cp.bmat([[Mbs[b],           Xis[b][bb]], 
+                            [Xis[b][bb], Thetas[b][bb]]])
+                constraints += [G >> 0.0]
 
+            
+            constraints += [sumb_xi == cp.trace(sumb_xi) * np.eye(3) / float(3)]
+            constraints += [sumb_theta == cp.trace(sumb_theta) * np.eye(3) / float(3)]
+                
         for b in range(bs):
             for x in range(xs):
                 pred = cp.real(cp.trace(Mbs[b] @ rho[x]))
-                constraints += [pred >= p[b][x] - 1e-4, pred <= p[b][x] + 1e-4]
+                constraints += [pred == p[b][x]]
         
         return constraints
 
@@ -200,7 +198,7 @@ def getH(m, xs, bs, p, rho, w, t, px):
     return prob.value
 
 def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
-    if not impl:
+    if impl == 0:
 
         obj = 0.0
         for i in range(m-1):
@@ -211,15 +209,18 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
                 sumbb0 = 0.0
                 sumbb1 = 0.0
                 for bb in range(bs):
-                    sumbb0 += Thetas[b][0][bb]
-                    sumbb1 += Thetas[b][1][bb]
+                    sumbb0 += Thetas[bb][0][b]
+                    sumbb1 += Thetas[bb][1][b]
                 sumb += (1-px) * cp.real(cp.trace(rho[0] @ (2*Xis[b][0][b] + (1 - t[i]) * Thetas[b][0][b] + t[i]*sumbb0)))
                 sumb += px * cp.real(cp.trace(rho[1] @ (2*Xis[b][1][b] + (1 - t[i]) * Thetas[b][1][b] + t[i]*sumbb1)))
 
             subObj = sumb * (w[i]/(t[i]*np.log(2)))
 
             prob = cp.Problem(cp.Minimize(subObj), constraints)
-            prob.solve(solver="MOSEK", verbose=False)
+            mosek_params = {
+                    "MSK_DPAR_INTPNT_CO_TOL_REL_GAP": 1e-1
+                }
+            prob.solve(solver='MOSEK',verbose=False, mosek_params=mosek_params)
             obj += prob.value
 
         cm = 0.0
@@ -230,32 +231,36 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
         obj += cm
 
         return obj
-    else:
+    elif impl == 1:
         obj = 0.0
-        for i in range(m-1):
+        for i in range(m):
             Mbs, Xis, Thetas = getMatricesFaster(xs, bs, impl=1)
             constraints = getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs, impl=1)
             sumb = 0.0
             for b in range(bs):
                 sumbb = 0.0
                 for bb in range(bs):
-                    sumbb += Thetas[b][bb]
+                    sumbb += Thetas[bb][b]
                 sumb += cp.real(cp.trace(rho[2] @ (2*Xis[b][b] + (1 - t[i]) * Thetas[b][b] + t[i]*sumbb)))
             subObj = sumb * (w[i]/(t[i]*np.log(2)))
 
             prob = cp.Problem(cp.Minimize(subObj), constraints)
-            prob.solve(solver="MOSEK", verbose=False)
-            # print(prob.status)
+            mosek_params = {
+                    "MSK_DPAR_INTPNT_CO_TOL_REL_GAP": 1e-1
+                }
+            prob.solve(solver='MOSEK',verbose=False, mosek_params=mosek_params)
             obj += prob.value
 
         cm = 0.0
 
-        for i in range(m-1):
+        for i in range(m):
             cm += w[i]/(t[i]*np.log(2))
 
         obj += cm
 
         return obj
+    else:
+        return "Wrong impl number"
 
 
 def runOpti(delta, p, px, method='Faster', impl = 0):
@@ -302,7 +307,7 @@ def runOpti(delta, p, px, method='Faster', impl = 0):
         xs = 3
         bs = 3
 
-        return getHFaster(m, xs, bs, p, rho, w, t, px, impl=1)
+        return getHFaster(m, xs, bs, p, rho, w, t, px, impl)
     
 
 
