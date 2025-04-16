@@ -4,29 +4,16 @@ import qutip as qt
 from math import sqrt
 import numpy as np
 
-def getMeasOps(impl='1'):
+def getMeasOps(): #useful for third reproducing paper results
     N=20 #truncation of fock space
+    M0 = qt.tensor((qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag()), qt.qeye(N)) #click in first
+    M1 = qt.tensor(qt.qeye(N), (qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag())) #in second
+    Mboth = qt.tensor((qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag()), (qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag())) #in both
+    M0_only = M0 - Mboth
+    M1_only = M1 - Mboth
+    Minc = qt.tensor(qt.qeye(N), qt.qeye(N)) - M0_only - M1_only - Mboth
 
-    if impl == '1':
-        M = qt.qeye(N) - qt.fock(N,0) * qt.fock(N,0).dag()
-        return M
-    elif impl == '2':
-        M0 = qt.tensor((qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag()), qt.qeye(N)) #Click is photon in first dimension
-        M1 = qt.tensor(qt.qeye(N), (qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag())) #in second dimension
-        Minc = qt.tensor(qt.qeye(N), qt.qeye(N)) - M0 - M1 #no click
-
-        return M0, M1, Minc
-    elif impl == '3':
-        M0 = qt.tensor((qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag()), qt.qeye(N)) #click in first
-        M1 = qt.tensor(qt.qeye(N), (qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag())) #in second
-        Mboth = qt.tensor((qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag()), (qt.qeye(N) - qt.fock(N,0)*qt.fock(N,0).dag())) #in both
-        M0_only = M0 - Mboth
-        M1_only = M1 - Mboth
-        Minc = qt.tensor(qt.qeye(N), qt.qeye(N)) - M0_only - M1_only - Mboth
-
-        return M0_only, M1_only, Mboth, Minc
-    else:
-        return "Wrong input for implementation"
+    return M0_only, M1_only, Mboth, Minc
 
 def measure(p, eff=1, impl='1'):
     if impl == '1':
@@ -161,6 +148,7 @@ def get_stat(data, impl, deadtime=False):
             p[2][x] = p2x
 
         return p, counts
+    
     else:
         counts = {0: {0: 0, 1: 0, 2: 0}, 1: {0: 0, 1: 0, 2: 0}, 2: {0: 0, 1: 0, 2: 0}}
         total = {0: 0, 1: 0, 2: 0}
@@ -187,22 +175,10 @@ def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False):
 
     N=20 #Fock space truncation
     if impl == '1':
-        psi0 = qt.coherent(N, 0)
-        psi1 = qt.coherent(N, alpha)
-        MeasOps = getMeasOps(impl)
-        # prob0 = abs((psi0.dag() * MeasOps * psi0).real)
-        # prob1 = abs((psi1.dag() * MeasOps * psi1).real)
         prob0 = 0
         prob1 = 1 - np.exp(-alpha**2)
         p = [prob0, prob1]
     elif impl == '2':
-        psi0 = qt.tensor(qt.coherent(N, alpha), qt.coherent(N, 0))
-        psi1 = qt.tensor(qt.coherent(N, 0), qt.coherent(N,alpha))
-        MeasOps = getMeasOps(impl)
-        # p00 = abs((psi0.dag() * MeasOps[0] * psi0).real)
-        # p10 = abs((psi0.dag() * MeasOps[1] * psi0).real)
-        # p01 = abs((psi1.dag() * MeasOps[0] * psi1).real)
-        # p11 = abs((psi1.dag() * MeasOps[1] * psi1).real)
         p00 = 1 - np.exp(-alpha**2)
         p10 = 0
         p01 = 0
@@ -212,7 +188,7 @@ def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False):
         psi0 = qt.tensor(qt.coherent(N, alpha[0]), qt.coherent(N, 0))
         psi1 = qt.tensor(qt.coherent(N, 0), qt.coherent(N, alpha[0]))
         psi2 = qt.tensor(qt.coherent(N, alpha[1]), qt.coherent(N, alpha[1]))
-        MeasOps = getMeasOps(impl)
+        MeasOps = getMeasOps()
         p00 = abs((psi0.dag() * MeasOps[0] * psi0).real)
         p10 = abs((psi0.dag() * MeasOps[1] * psi0).real)
         pboth0 = abs((psi0.dag() * MeasOps[2] * psi0).real)
@@ -230,7 +206,6 @@ def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False):
     
     if impl == '1' or impl == '2':
 
-        # delta = abs((psi0.dag() * psi1)) #overlap
         if impl == '1' : 
             delta = np.exp(-alpha**2/2)
         else: 
