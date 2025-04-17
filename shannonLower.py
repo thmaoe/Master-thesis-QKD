@@ -6,7 +6,7 @@ import chaospy
 
 def getMatricesFaster(xs, bs, impl=0): #Faster version -- better to use this one
 
-    if not impl:
+    if impl==0:
         Mbs = {}
 
         for i in range(bs):
@@ -98,6 +98,8 @@ def getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs, impl=0):
             
             constraints += [sumb_xi == cp.trace(sumb_xi) * np.eye(3) / float(3)]
             constraints += [sumb_theta == cp.trace(sumb_theta) * np.eye(3) / float(3)]
+        
+        constraints += [sumb_m == np.identity(3)]
                 
         for b in range(bs):
             for x in range(xs):
@@ -159,6 +161,8 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
                     "MSK_DPAR_INTPNT_CO_TOL_REL_GAP": 1e-1
                 }
             prob.solve(solver='MOSEK',verbose=False, mosek_params=mosek_params)
+            print("aaa")
+            print(Mbs[0].value)
             obj += prob.value
 
         cm = 0.0
@@ -175,7 +179,7 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
 
 
 def runOpti(delta, p, px, impl = 0):
-    if not impl:
+    if impl == 0:
         rho0 = np.array([[1.,0],[0,0]])
         rho1 = np.array([[delta**2, delta*np.sqrt(1-delta**2)], 
                         [delta*np.sqrt(1-delta**2), 1-delta**2]])
