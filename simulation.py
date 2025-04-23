@@ -1,7 +1,7 @@
 ## Function for simulating different protocols and output statistics
 
 import qutip as qt
-from math import sqrt
+from math import sqrt, exp
 import numpy as np
 
 def getMeasOps(): #useful for third reproducing paper results
@@ -167,7 +167,48 @@ def get_stat(data, impl, deadtime=False):
 
         return p, counts
 
+def getProbas(alpha, eff, dc, impl, deadtime = False): #theoretical p(b|x)
+    if impl == '1':
+        p10 = dc
+        p20 = 1 - dc
+        p11 = 1 - (1 - dc)*exp(-alpha**2*eff)
+        p21 = (1 - dc)*exp(-alpha**2*eff) ##prob no dc * get no click (|<0|alpha>|^2), and eff = BS of transmissivity eta so |alpha> becomes |alpha*sqrt(eta)>
+        delta = exp(-alpha**2/2)
+        p = {0: {0: 0.0, 1: 0.0}, 1: {0: p10, 1: p11}, 2: {0: p20, 1: p21}}
 
+    elif impl == '2':
+        p00 = 1 - (1 - dc)*exp(-alpha**2*eff)
+        p10 = (1 - p00)*dc #no click in first * dark count 
+        p11 = 1 - (1 - dc)*exp(-alpha**2*eff)
+        p01 = (1 - p11)*dc
+        p20 = (1 - dc)**2*exp(-alpha**2*eff)
+        p21 = (1 - dc)**2*exp(-alpha**2*eff)
+        p = {0: {0: p00, 1: p01}, 1: {0: p10, 1: p11}, 2: {0: p20, 1: p21}}
+        delta = exp(-alpha**2)
+    else:
+        return "Wrong impl number"
+    
+    if deadtime:
+        td = 34e-9  # detector dead time in seconds
+        pulse_rate = 50e6  # pulse rate in Hz
+
+        for x in (0, 1):
+            p0x = p[0][x]
+            p1x = p[1][x]
+
+            click_rate = (p0x + p1x) * pulse_rate
+
+            cd = 1 / (1 + td * click_rate)
+
+            p0x_corr = p0x * cd
+            p1x_corr = p1x * cd
+            p2x_corr = 1 - (p0x_corr + p1x_corr)  # renormalize
+
+            p[0][x] = p0x_corr
+            p[1][x] = p1x_corr
+            p[2][x] = p2x_corr
+            
+    return delta, p
 
 
 

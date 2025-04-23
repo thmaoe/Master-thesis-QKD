@@ -104,7 +104,7 @@ def getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs, impl=0):
         for b in range(bs):
             for x in range(xs):
                 pred = cp.real(cp.trace(Mbs[b] @ rho[x]))
-                constraints += [pred == p[b][x]]
+                constraints += [pred >= p[b][x] - 1e-3, pred <= p[b][x] + 1e-3]
         
         return constraints
 
@@ -128,10 +128,7 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
             subObj = sumb * (w[i]/(t[i]*np.log(2)))
 
             prob = cp.Problem(cp.Minimize(subObj), constraints)
-            mosek_params = {
-                    "MSK_DPAR_INTPNT_CO_TOL_REL_GAP": 1e-1
-                }
-            prob.solve(solver='MOSEK',verbose=False, mosek_params=mosek_params)
+            prob.solve(solver='MOSEK',verbose=False)
             obj += prob.value
 
         cm = 0.0
@@ -157,12 +154,7 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
             subObj = sumb * (w[i]/(t[i]*np.log(2)))
 
             prob = cp.Problem(cp.Minimize(subObj), constraints)
-            mosek_params = {
-                    "MSK_DPAR_INTPNT_CO_TOL_REL_GAP": 1e-1
-                }
-            prob.solve(solver='MOSEK',verbose=False, mosek_params=mosek_params)
-            print("aaa")
-            print(Mbs[0].value)
+            prob.solve(solver='MOSEK',verbose=False)
             obj += prob.value
 
         cm = 0.0
