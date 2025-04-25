@@ -17,7 +17,7 @@ def getMeasOps(): #useful for third reproducing paper results
 
 def measure(p, eff=1, impl='1'):
     if impl == '1':
-        if np.random.rand() < p:
+        if np.random.rand() < p[1]:
             if np.random.rand() < eff:
                 return 1
             else:
@@ -30,18 +30,15 @@ def measure(p, eff=1, impl='1'):
         
     elif impl == '2':
 
-        p0 = p[0]
-        p1 = p[1]
-
         r = np.random.rand() #for measurement
         reff = np.random.rand() #for efficiency
 
-        if r < p0:
+        if r < p[0]:
             if reff < eff:
                 return 0
             else:
                 return 2
-        elif r < p0 + p1:
+        elif r < p[0] + p[1]:
             if reff < eff:
                 return 1
             else:
@@ -171,20 +168,20 @@ def getProbas(alpha, eff, dc, impl, deadtime = False): #theoretical p(b|x)
     if impl == '1':
         p10 = dc
         p20 = 1 - dc
-        p11 = 1 - (1 - dc)*exp(-alpha**2*eff)
-        p21 = (1 - dc)*exp(-alpha**2*eff) ##prob no dc * get no click (|<0|alpha>|^2), and eff = BS of transmissivity eta so |alpha> becomes |alpha*sqrt(eta)>
-        delta = exp(-alpha**2/2)
+        p11 = 1 - (1 - dc)*exp(-abs(alpha)**2*eff)
+        p21 = (1 - dc)*exp(-abs(alpha)**2*eff) ##prob no dc * get no click (|<0|alpha>|^2), and eff = BS of transmissivity eta so |alpha> becomes |alpha*sqrt(eta)>
+        delta = exp(-abs(alpha)**2/2)
         p = {0: {0: 0.0, 1: 0.0}, 1: {0: p10, 1: p11}, 2: {0: p20, 1: p21}}
 
     elif impl == '2':
-        p00 = 1 - (1 - dc)*exp(-alpha**2*eff)
+        p00 = 1 - (1 - dc)*exp(-abs(alpha)**2*eff)
         p10 = (1 - p00)*dc #no click in first * dark count 
-        p11 = 1 - (1 - dc)*exp(-alpha**2*eff)
+        p11 = 1 - (1 - dc)*exp(-abs(alpha)**2*eff)
         p01 = (1 - p11)*dc
-        p20 = (1 - dc)**2*exp(-alpha**2*eff)
-        p21 = (1 - dc)**2*exp(-alpha**2*eff)
+        p20 = (1 - dc)**2*exp(-abs(alpha)**2*eff)
+        p21 = (1 - dc)**2*exp(-abs(alpha)**2*eff)
         p = {0: {0: p00, 1: p01}, 1: {0: p10, 1: p11}, 2: {0: p20, 1: p21}}
-        delta = exp(-alpha**2)
+        delta = exp(-abs(alpha)**2)
     else:
         return "Wrong impl number"
     
@@ -207,25 +204,18 @@ def getProbas(alpha, eff, dc, impl, deadtime = False): #theoretical p(b|x)
             p[0][x] = p0x_corr
             p[1][x] = p1x_corr
             p[2][x] = p2x_corr
-            
+
     return delta, p
 
 
 
-def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False):
+def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False, badSource = False):
 
-    N=20 #Fock space truncation
-    if impl == '1':
-        prob0 = 0
-        prob1 = 1 - np.exp(-alpha**2)
-        p = [prob0, prob1]
-    elif impl == '2':
-        p00 = 1 - np.exp(-alpha**2)
-        p10 = 0
-        p01 = 0
-        p11 = 1 - np.exp(-alpha**2)
-        p = [(p00, p10), (p01, p11)]
-    elif impl == '3':
+    if badSource:
+        goodAlpha = alpha
+
+    if impl == '3':
+        N=20 #Fock space truncation
         psi0 = qt.tensor(qt.coherent(N, alpha[0]), qt.coherent(N, 0))
         psi1 = qt.tensor(qt.coherent(N, 0), qt.coherent(N, alpha[0]))
         psi2 = qt.tensor(qt.coherent(N, alpha[1]), qt.coherent(N, alpha[1]))
@@ -241,31 +231,43 @@ def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False):
         pboth2 = abs((psi2.dag() * MeasOps[2] * psi2).real)
 
         p = [(p00, p10, pboth0), (p01, p11, pboth1), (p02, p12, pboth2)]
-
     else:
-        return "Wrong implementation number"
+        pass
     
     if impl == '1' or impl == '2':
 
-        if impl == '1' : 
-            delta = np.exp(-alpha**2/2)
-        else: 
-            delta = np.exp(-alpha**2)
-
         data = []
-
+        alphas = []
+        i = 0
         for _ in range(nPoints):
+            if badSource:
+                alpha = goodAlpha + np.random.normal(0, 0.05/(2*goodAlpha)) #the source is not perfect so sends |alpha + delta>
+                alphas.append(alpha)
             x = pick_x(px1)
-            if x:
-                b = measure(p[1], eff, impl)
-                data.append((b,x))
+            _, p = getProbas(alpha, 1, 0, '1', False)
+            p = [p[b][x] for b in range(3)]
+            b = measure(p, eff, impl)
+            data.append((b,x))
+        
+        if impl == '1' : 
+            if badSource:
+                alphamax = np.percentile(np.abs(alphas), 99.9)
+                delta = exp(-abs(alphamax)**2/2)
             else:
-                b = measure(p[0], eff, impl)
-                data.append((b,x))
+                delta = exp(-abs(alpha)**2/2)
+        else: 
+            if badSource:
+                alphamax = np.percentile(np.abs(alphas), 99.9)
+                delta = exp(-abs(alphamax)**2)
+            else:
+                delta = exp(-abs(alpha)**2)
 
         probs = get_stat(data, impl, deadtime)
 
-        return delta, probs
+        if badSource:
+            return alphamax, delta, probs
+        else:
+            return delta, probs
     
     else:
 
