@@ -2,7 +2,7 @@
 
 import qutip as qt
 
-def handle_non_phys(p, alpha, impl = '1'): ##Handling non physical probas which happen when efficiency is close from 1
+def handle_non_phys(p, alpha, impl = '1'): ##Handling non physical probas which happens bc of finite size sampling
     if impl == '1':
         
         psi0 = qt.coherent(20, 0)
@@ -13,7 +13,7 @@ def handle_non_phys(p, alpha, impl = '1'): ##Handling non physical probas which 
             p[0][1][1] = 1 - (p_+1e-3)
 
         return p
-    else:
+    elif impl == '2':
         psi0 = qt.coherent(20, 0)
         psi1 = qt.coherent(20, alpha)
         p_ = abs(psi0.dag()*psi1)**2

@@ -175,15 +175,45 @@ def getProbas(alpha, eff, dc, impl, deadtime = False): #theoretical p(b|x)
 
     elif impl == '2':
         p00 = 1 - (1 - dc)*exp(-abs(alpha)**2*eff)
-        p10 = (1 - p00)*dc #no click in first * dark count 
+        p10 = (1 - p00)*dc #no click in first * dark count
         p11 = 1 - (1 - dc)*exp(-abs(alpha)**2*eff)
         p01 = (1 - p11)*dc
         p20 = (1 - dc)**2*exp(-abs(alpha)**2*eff)
         p21 = (1 - dc)**2*exp(-abs(alpha)**2*eff)
         p = {0: {0: p00, 1: p01}, 1: {0: p10, 1: p11}, 2: {0: p20, 1: p21}}
         delta = exp(-abs(alpha)**2)
+
     else:
-        return "Wrong impl number"
+        p00 = (1 - dc) * ((1 - dc)*(1 - np.exp(-np.abs(alpha[0])**2*eff)) + dc) #I sent |alpha>|0>, i want proba to measure same thing. I.e, in first bin click and in second no click, having sent the same stuff: (no dark AND click OR dark) AND no dark
+        p10 = (1 - dc) * dc * np.exp(-np.abs(alpha[0])**2*eff) #here i sent |alpha>|0> -> measure nothing in first and click in second: so this is no click AND no dark (first) AND dark
+        p20 = (1 - dc) * (1 - dc) * np.exp(-np.abs(alpha[0])**2*eff) #etc...
+        pdouble0 = 1 - p00 - p10 - p20
+
+        p01 = (1 - dc) * dc * np.exp(-np.abs(alpha[0])**2*eff) #here i sent |0>|alpha> -> measure click in first and nothing in second, so we have dark (first) AND no click AND no dark.
+        p11 = (1 - dc) * ((1 - dc)*(1 - np.exp(-np.abs(alpha[0])**2*eff)) + dc)
+        p21 = (1 - dc) * (1 - dc) * np.exp(-np.abs(alpha[0])**2*eff)
+        pdouble1 = 1 - p01 - p11 - p21
+
+        p02 = (1 - dc)*(1 - dc)*(1 - np.exp(-np.abs(alpha[1])**2*eff))*np.exp(-np.abs(alpha[1])**2*eff) + dc*(1 - dc) #here, we sent |beta>|beta> -> click only in first. This corresponds to (no dark AND click) AND (no dark AND no click) OR dark AND no dark
+        p12 = (1 - dc)*(1 - dc)*(1 - np.exp(-np.abs(alpha[1])**2*eff))*np.exp(-np.abs(alpha[1])**2*eff) + dc*(1 - dc)
+        p22 = (1 - dc)*(1 - dc)*np.exp(-np.abs(alpha[1])**2*eff)*np.exp(-np.abs(alpha[1])**2*eff) + dc*dc
+        pdouble2 = 1 - p02 - p12 - p22
+
+        p00 += 1/2 * pdouble0
+        p10 += 1/2 * pdouble0
+
+        p01 += 1/2 * pdouble1
+        p11 += 1/2 * pdouble1
+
+        p02 += 1/2 * pdouble2
+        p12 += 1/2 * pdouble2
+
+
+        p = {0: {0: p00, 1: p01, 2: p02}, 1: {0: p10, 1: p11, 2: p12}, 2: {0: p20, 1: p21, 2: p22}}
+        d01 = np.exp(-np.abs(alpha[0]**2))
+        d02 = np.exp(-np.abs(alpha[0])**2/2) * np.exp(-np.abs(alpha[1])**2) * np.exp(alpha[0]*alpha[1])
+        d12 = np.exp(-np.abs(alpha[0])**2/2) * np.exp(-np.abs(alpha[1])**2) * np.exp(alpha[0]*alpha[1])
+        delta = (d01, d02, d12)
     
     if deadtime:
         td = 34e-9  # detector dead time in seconds
@@ -238,7 +268,6 @@ def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False, bad
 
         data = []
         alphas = []
-        i = 0
         for _ in range(nPoints):
             if badSource:
                 alpha = goodAlpha + np.random.normal(0, 0.05/(2*goodAlpha)) #the source is not perfect so sends |alpha + delta>
