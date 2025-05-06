@@ -34,7 +34,7 @@ def getMatricesFaster(xs, bs, impl=0): #Faster version -- better to use this one
         Mbs = {}
 
         for i in range(bs):
-            Mbs[i] = cp.Variable((3,3), hermitian=True) ##we have only 2 inputs so we in dimension 2
+            Mbs[i] = cp.Variable((3,3), complex=True) ##we have only 2 inputs so we in dimension 2
 
         Xis = {}
 
@@ -111,6 +111,7 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
     if impl == 0:
 
         obj = 0.0
+        H = 0.0
         for i in range(m-1):
             Mbs, Xis, Thetas = getMatricesFaster(xs, bs)
             constraints = getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs)
@@ -127,7 +128,13 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
             subObj = sumb * (w[i]/(t[i]*np.log(2)))
 
             prob = cp.Problem(cp.Minimize(subObj), constraints)
-            prob.solve(solver='MOSEK',verbose=False)
+            prob.solve(solver='MOSEK',verbose=(i==100))
+            h_try = 0.0
+            for b in range(3):
+                for x in range(2):
+                    h_try += constraints[-1-6+(b+x)].dual_value * p[b][x]
+            h_try += np.real(np.trace(constraints[-1-7]))
+            H -= h_try
             obj += prob.value
 
         cm = 0.0
@@ -136,6 +143,8 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
             cm += w[i]/(t[i]*np.log(2))
 
         obj += cm
+        H += cm
+        print(H)
 
         return obj
     
@@ -168,6 +177,109 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
     else:
         return "Wrong impl number"
 
+def getHDual(delta, p, px):
+
+    px = [1-px, px]
+
+    m_in = 4
+    m = int(m_in*2)
+    distribution = chaospy.Uniform(lower=0, upper=1)
+    t, w = chaospy.quadrature.radau(m_in,distribution,1.0)
+    t = t[0]
+
+    rho0 = np.array([[1.,0],[0,0]])
+    rho1 = np.array([[delta**2, delta*np.sqrt(1-delta**2)], 
+                    [delta*np.sqrt(1-delta**2), 1-delta**2]])
+    rho1 = rho1 / np.trace(rho1) #bc of floating errors
+
+    rho = {0: rho0, 1: rho1}
+
+    H = 0.0
+
+    for i in range(m-1):
+        ti = t[i]
+        taui =  (w[i]/(t[i]*np.log(2)))
+
+        Lambda = cp.Variable((2,2), complex=True)
+
+        Gammas = {}
+        for a in range(3):
+            Gammas[a] = {}
+            for x in range(2):
+                Gammas[a][x] = cp.Variable((2,2), complex = True)
+
+        Deltas = {}
+        for a in range(3):
+            Deltas[a] = {}
+            for x in range(2):
+                Deltas[a][x] = cp.Variable((2,2), complex = True)
+
+        lambdasbx = {}
+        for b in range(3):
+            lambdasbx[b] = {}
+            for x in range(2):
+                lambdasbx[b][x] = cp.Variable()
+
+        As = {}
+        for a in range(3):
+            As[a] = {}
+            for x in range(2):
+                As[a][x] = {}
+                for b in range(3):
+                    As[a][x][b] = cp.Variable((2,2), complex = True)
+
+        Bs = {}
+        for a in range(3):
+            Bs[a] = {}
+            for x in range(2):
+                Bs[a][x] = {}
+                for b in range(3):
+                    Bs[a][x][b] = cp.Variable((2,2), complex = True)
+
+        Cs = {}
+        for a in range(3):
+            Cs[a] = {}
+            for x in range(2):
+                Cs[a][x] = {}
+                for b in range(3):
+                    Cs[a][x][b] = cp.Variable((2,2), complex = True)
+        
+        constraints = []
+
+        constraints += [sum([ As[a][x][b] for a in range(3) for x in range(2)]) == sum([lambdasbx[b][x] * rho[x] for x in range(2)]) + Lambda for b in range(3)] ##somehow this one works but not with the delta_ab, maybe bc we set 0 which is not good
+
+        for a in range(3):
+            for x in range(2):
+                for b in range(3):
+                    Sab10 = 2*taui*(a==b)*px[x]*rho[x] + Gammas[a][x] - 1/2*cp.trace(Gammas[a][x])*np.eye(2)
+                    Sab11 = taui * ((1-ti)*(a==b) + ti) * px[x] * rho[x] + Deltas[a][x] - 1/2*cp.trace(Deltas[a][x])*np.eye(2)
+                    constraints += [Cs[a][x][b] == Sab11]
+                    constraints += [Bs[a][x][b] + Bs[a][x][b].H == Sab10]
+
+        for a in range(3):
+            for x in range(2):
+                for b in range(3):
+                    Rab = cp.bmat([[As[a][x][b], Bs[a][x][b]], 
+                                [Bs[a][x][b].H, Cs[a][x][b]]])
+                    constraints += [Rab >> 0]
+
+        sumbx = sum([lambdasbx[b][x] * p[b][x] for b in range(3) for x in range(2)])
+
+        obj = cp.real(-cp.trace(Lambda) - sumbx)
+
+        prob = cp.Problem(cp.Maximize(obj), constraints)
+        prob.solve(solver='MOSEK')
+              
+        H += prob.value
+        
+    cm = 0.0
+
+    for i in range(m-1):
+        cm += w[i]/(t[i]*np.log(2))
+
+    H += cm
+
+    return H
 
 def runOpti(delta, p, px, impl = 0):
     if impl == 0:
@@ -186,8 +298,7 @@ def runOpti(delta, p, px, impl = 0):
         xs = 2
         bs = 3
 
-        return getHFaster(m, xs, bs, p, rho, w, t, px)
-        
+        return getHFaster(m, xs, bs, p, rho, w, t, px)  
 
     else:
         a = np.abs((delta[1]+delta[2])/np.sqrt(2.0*(1.0+delta[0])))**2.0 + np.abs((delta[1]-delta[2])/np.sqrt(2.0*(1.0-delta[0])))**2.0

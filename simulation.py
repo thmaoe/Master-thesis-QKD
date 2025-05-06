@@ -23,7 +23,7 @@ def measure(p, eff=1, impl='1'):
             else:
                 return 2
         else:
-            if np.random.rand() < 1e-6: # dark counts
+            if np.random.rand() < 0: # dark counts
                 return 1
             else:
                 return 2
@@ -330,4 +330,3 @@ def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False, bad
         return (d01, d02, d12), probs
 
     
-
