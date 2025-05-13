@@ -111,7 +111,6 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
     if impl == 0:
 
         obj = 0.0
-        H = 0.0
         for i in range(m-1):
             Mbs, Xis, Thetas = getMatricesFaster(xs, bs)
             constraints = getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs)
@@ -129,12 +128,6 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
 
             prob = cp.Problem(cp.Minimize(subObj), constraints)
             prob.solve(solver='MOSEK',verbose=(i==100))
-            h_try = 0.0
-            for b in range(3):
-                for x in range(2):
-                    h_try += constraints[-1-6+(b+x)].dual_value * p[b][x]
-            h_try += np.real(np.trace(constraints[-1-7]))
-            H -= h_try
             obj += prob.value
 
         cm = 0.0
@@ -143,9 +136,6 @@ def getHFaster(m, xs, bs, p, rho, w, t, px, impl = 0):
             cm += w[i]/(t[i]*np.log(2))
 
         obj += cm
-        H += cm
-        print(H)
-
         return obj
     
     elif impl == 1:
@@ -195,6 +185,8 @@ def getHDual(delta, p, px):
     rho = {0: rho0, 1: rho1}
 
     H = 0.0
+    Lambdas = []
+    Rs = []
 
     for i in range(m-1):
         ti = t[i]
@@ -269,8 +261,15 @@ def getHDual(delta, p, px):
 
         prob = cp.Problem(cp.Maximize(obj), constraints)
         prob.solve(solver='MOSEK')
-              
+        lambdas = {}
+        for b in range(3):
+            lambdas[b] = {}
+            for x in range(2):
+                lambdas[b][x] = (lambdasbx[b][x].value)
+                
         H += prob.value
+        Lambdas.append(lambdas)
+        Rs.append(np.real(Lambda.value))
         
     cm = 0.0
 
@@ -279,7 +278,7 @@ def getHDual(delta, p, px):
 
     H += cm
 
-    return H
+    return H, Lambdas, Rs, cm
 
 def runOpti(delta, p, px, impl = 0):
     if impl == 0:
