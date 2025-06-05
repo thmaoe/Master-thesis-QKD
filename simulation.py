@@ -3,6 +3,7 @@
 import qutip as qt
 from math import sqrt, exp
 import numpy as np
+from scipy.special import erf as erf
 
 def getMeasOps(): #useful for third reproducing paper results
     N=20 #truncation of fock space
@@ -164,7 +165,7 @@ def get_stat(data, impl, deadtime=False):
 
         return p, counts
 
-def getProbas(alpha, eff, dc, impl, deadtime = False): #theoretical p(b|x)
+def getProbas(alpha, eff, dc, impl, deadtime = False, d = 0): #theoretical p(b|x)
     if impl == '1':
         p10 = dc
         p20 = 1 - dc
@@ -183,7 +184,7 @@ def getProbas(alpha, eff, dc, impl, deadtime = False): #theoretical p(b|x)
         p = {0: {0: p00, 1: p01}, 1: {0: p10, 1: p11}, 2: {0: p20, 1: p21}}
         delta = exp(-abs(alpha)**2)
 
-    else:
+    elif impl == '3':
         p00 = (1 - dc) * ((1 - dc)*(1 - np.exp(-np.abs(alpha[0])**2*eff)) + dc) #I sent |alpha>|0>, i want proba to measure same thing. I.e, in first bin click and in second no click, having sent the same stuff: (no dark AND click OR dark) AND no dark
         p10 = (1 - dc) * dc * np.exp(-np.abs(alpha[0])**2*eff) #here i sent |alpha>|0> -> measure nothing in first and click in second: so this is no click AND no dark (first) AND dark
         p20 = (1 - dc) * (1 - dc) * np.exp(-np.abs(alpha[0])**2*eff) #etc...
@@ -214,6 +215,33 @@ def getProbas(alpha, eff, dc, impl, deadtime = False): #theoretical p(b|x)
         d02 = np.exp(-np.abs(alpha[0])**2/2) * np.exp(-np.abs(alpha[1])**2) * np.exp(alpha[0]*alpha[1])
         d12 = np.exp(-np.abs(alpha[0])**2/2) * np.exp(-np.abs(alpha[1])**2) * np.exp(alpha[0]*alpha[1])
         delta = (d01, d02, d12)
+    
+    elif impl == '4':
+
+        p00 = 1/2 * (1 + erf(np.sqrt(2) * np.abs(alpha)))
+        p01 = 1/2 * (1 - erf(np.sqrt(2) * np.abs(alpha)))
+
+        p10 = 1/2 * (1 - erf(np.sqrt(2) * np.abs(alpha)))
+        p11 = 1/2 * (1 + erf(np.sqrt(2) * np.abs(alpha)))
+
+        delta = np.exp(-2*(np.abs(alpha)**2))
+
+        p = {0: {0: 0, 1: 0}, 1: {0: p10, 1: p11}, 2: {0: p00, 1: p01}}
+    
+    elif impl == '5':
+        
+        p00 = 1/2 * (1 - erf(d - np.sqrt(2) * np.abs(alpha)))
+        p01 = 1/2 * (1 - erf(d + np.sqrt(2) * np.abs(alpha)))
+
+        p10 = 1/2 * (1 - erf(d + np.sqrt(2) * np.abs(alpha)))
+        p11 = 1/2 * (1 - erf(d - np.sqrt(2) * np.abs(alpha)))
+
+        p20 = 1/2 * (erf(d - np.sqrt(2) * np.abs(alpha)) + erf(d + np.sqrt(2) * np.abs(alpha)))
+        p21 = 1/2 * (erf(d - np.sqrt(2) * np.abs(alpha)) + erf(d + np.sqrt(2) * np.abs(alpha)))
+
+        delta = np.exp(-2*(np.abs(alpha)**2))
+
+        p = {0: {0: p00, 1: p01}, 1: {0: p10, 1: p11}, 2: {0: p20, 1: p21}}
     
     if deadtime:
         td = 34e-9  # detector dead time in seconds
