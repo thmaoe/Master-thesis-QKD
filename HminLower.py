@@ -21,17 +21,17 @@ def getHmin(p, delta, px): ##this works only for implementation 1
     rho1 = np.array([[delta**2, delta*np.sqrt(1-delta**2)], [delta*np.sqrt(1-delta**2), 1-delta**2]])
     rho1 = rho1 / np.trace(rho1)
 
-    constraints = [(rho0 * ((1-px) - muinc0) + rho1 * (px - muinc1) + H00 - 0.5*cp.trace(H00)*np.eye(2)) << 0]
+    constraints = [(rho0 * ((1-px) - muinc0) + rho1 * (px - muinc1) + H00 - 0.5*cp.trace(H00)*np.eye(2)) << 0] #b=inc
     constraints += [(rho0 * ((1-px) - muinc0) - rho1 * (muinc1) + H01 - 0.5*cp.trace(H01)*np.eye(2)) << 0]
     constraints += [(-rho0 * (muinc0) + rho1 * (px - muinc1) + H10 - 0.5*cp.trace(H10)*np.eye(2)) << 0]
     constraints += [(-rho0 * (muinc0) - rho1 * (muinc1) + H11 - 0.5*cp.trace(H11)*np.eye(2)) << 0]
 
-    constraints += [(-rho0 * (mu00) - rho1 * (mu01) + H00 - 0.5*cp.trace(H00)*np.eye(2)) << 0]
+    constraints += [(-rho0 * (mu00) - rho1 * (mu01) + H00 - 0.5*cp.trace(H00)*np.eye(2)) << 0] #b=0
     constraints += [(-rho0 * (mu00) + rho1 * (px - mu01) + H01 - 0.5*cp.trace(H01)*np.eye(2)) << 0]
     constraints += [(rho0 * ((1-px) - mu00) - rho1 * (mu01) + H10 - 0.5*cp.trace(H10)*np.eye(2)) << 0]
     constraints += [(rho0 * ((1-px) - mu00) + rho1 * (px - mu01) + H11 - 0.5*cp.trace(H11)*np.eye(2)) << 0]
 
-    constraints += [(-rho0 * (mu10) - rho1 * (mu11) + H00 - 0.5*cp.trace(H00)*np.eye(2)) << 0]
+    constraints += [(-rho0 * (mu10) - rho1 * (mu11) + H00 - 0.5*cp.trace(H00)*np.eye(2)) << 0] #b=1
     constraints += [(-rho0 * (mu10) + rho1 * (px - mu11) + H01 - 0.5*cp.trace(H01)*np.eye(2)) << 0]
     constraints += [(rho0 * ((1-px) - mu10) - rho1 * (mu11) + H10 - 0.5*cp.trace(H10)*np.eye(2)) << 0]
     constraints += [(rho0 * ((1-px) - mu10) + rho1 * (px - mu11) + H11 - 0.5*cp.trace(H11)*np.eye(2)) << 0]
@@ -43,6 +43,5 @@ def getHmin(p, delta, px): ##this works only for implementation 1
 
     prob = cp.Problem(cp.Minimize(obj), constraints)
     prob.solve(solver = "MOSEK")
-
 
     return -np.log2(prob.value)

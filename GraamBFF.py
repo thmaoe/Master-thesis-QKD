@@ -41,11 +41,9 @@ def getCs(Gamma00, Gamma11, p, constraints):
             Cs[b][x][2][ids[b][2]] = 1
             if x == 0:
                 for i in range(3):
-                    # C = np.kron(Cs[b][x][i], np.array([[1,0], [0,0]])).T
                     constraints += [(cp.trace(Gamma00 @ Cs[b][x][i].T)) == p[b][x]]
             elif x == 1:
                 for i in range(3):
-                    # C = np.kron(Cs[b][x][i], np.array([[0,0], [0,1]])).T
                     constraints += [(cp.trace(Gamma11 @ Cs[b][x][i].T)) == p[b][x]]
 
 def getDs(Gammas, delta, constraints):
@@ -59,10 +57,8 @@ def getDs(Gammas, delta, constraints):
 
     constraints += [(cp.trace(Gammas[0] @ Ds[0].T)) <= 1 + 1e-8]
     constraints += [(cp.trace(Gammas[0] @ Ds[0].T)) >= 1 - 1e-8]
-    constraints += [(cp.trace(Gammas[1] @ Ds[1].T)) <= delta + 1e-8]
-    constraints += [(cp.trace(Gammas[1] @ Ds[1].T)) >= delta - 1e-8]
-    constraints += [(cp.trace(Gammas[2] @ Ds[2].T)) <= delta + 1e-8]
-    constraints += [(cp.trace(Gammas[2] @ Ds[2].T)) >= delta - 1e-8]
+    constraints += [(cp.trace(Gammas[1] @ Ds[1].T)) >= delta]
+    constraints += [(cp.trace(Gammas[2] @ Ds[2].T)) >= delta]
     constraints += [(cp.trace(Gammas[3] @ Ds[3].T)) <= 1 + 1e-8]
     constraints += [(cp.trace(Gammas[3] @ Ds[3].T)) >= 1 - 1e-8]
 
@@ -97,10 +93,8 @@ def getMs(Gammas, delta, constraints):
 
     constraints += [cp.trace(Gammas[0] @ Ms[0][j].T) <= 1 + 1e-8 for j in range(27)]
     constraints += [cp.trace(Gammas[0] @ Ms[0][j].T) >= 1 - 1e-8 for j in range(27)]
-    constraints += [cp.trace(Gammas[1] @ Ms[1][j].T) <= delta + 1e-8 for j in range(27)]
-    constraints += [cp.trace(Gammas[1] @ Ms[1][j].T) >= delta - 1e-8 for j in range(27)]
-    constraints += [cp.trace(Gammas[2] @ Ms[2][j].T) <= delta + 1e-8 for j in range(27)]
-    constraints += [cp.trace(Gammas[2] @ Ms[2][j].T) >= delta - 1e-8 for j in range(27)]
+    constraints += [cp.trace(Gammas[1] @ Ms[1][j].T) >= delta for j in range(27)]
+    constraints += [cp.trace(Gammas[2] @ Ms[2][j].T) >= delta for j in range(27)]
     constraints += [cp.trace(Gammas[3] @ Ms[3][j].T) <= 1 + 1e-8 for j in range(27)]
     constraints += [cp.trace(Gammas[3] @ Ms[3][j].T) >= 1 - 1e-8 for j in range(27)]
 
@@ -108,7 +102,7 @@ def genZEqs():
 
     # Your operator lists
     S = [
-        "id", "M0", "M1", "M2", 
+        "id", "M0", "M1", "M2",
         "Z00", "Z00dag", "Z10", "Z10dag", "Z20", "Z20dag", 
         "Z01", "Z01dag", "Z11", "Z11dag", "Z21", "Z21dag", 
         "Z00Z00dag", "Z10Z10dag","Z20Z20dag", "Z01Z01dag", 

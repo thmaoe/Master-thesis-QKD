@@ -4,6 +4,7 @@ import qutip as qt
 from math import sqrt, exp
 import numpy as np
 from scipy.special import erf as erf
+import time
 
 def getMeasOps(): #useful for third reproducing paper results
     N=20 #truncation of fock space
@@ -92,8 +93,22 @@ def measure(p, eff=1, impl='1'):
             else:
                 return 2
                   
-    else:
-        return "Wrong input for implementation" 
+    elif impl == '4':
+
+        if np.random.rand() < p[1]:
+            return 1
+        else:
+            return 2
+
+    elif impl == '5':
+        r = np.random.rand()
+
+        if r < p[0]:
+            return 0
+        elif r < p[0] + p[1]:
+            return 1
+        else:
+            return 2    
         
 
 def pick_x(px1):
@@ -104,7 +119,7 @@ def pick_x(px1):
 
 
 def get_stat(data, impl, deadtime=False):
-    if impl == '1' or impl == '2':
+    if impl != '3' :
         td = 34e-9  # detector dead time in seconds
         pulse_rate = 50e6  # 50 MHz as in paper
 
@@ -267,7 +282,7 @@ def getProbas(alpha, eff, dc, impl, deadtime = False, d = 0): #theoretical p(b|x
 
 
 
-def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False, badSource = False):
+def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False, badSource = False, d=0):
 
     if badSource:
         goodAlpha = alpha
@@ -292,32 +307,42 @@ def doSimul(alpha, px1=1/2, impl='1', nPoints=100000, eff=1, deadtime=False, bad
     else:
         pass
     
-    if impl == '1' or impl == '2':
+    if impl != '3':
 
         data = []
         alphas = []
+        _, p = getProbas(alpha, 1, 0, impl, False, d)
         for _ in range(nPoints):
             if badSource:
-                alpha = goodAlpha + np.random.normal(0, 0.05/(2*goodAlpha)) #the source is not perfect so sends |alpha + delta>
-                alphas.append(alpha)
+                if alpha==0:
+                    alphas.append(alpha)
+                    _, p = getProbas(alpha, 1, 0, impl, False, d)
+                else:
+                    alpha = goodAlpha + np.random.normal(0, 0.05/(2*goodAlpha)) #the source is not perfect so sends |alpha + delta>
+                    alphas.append(alpha)
+                _, p = getProbas(alpha, 1, 0, impl, False, d)
             x = pick_x(px1)
-            _, p = getProbas(alpha, 1, 0, '1', False)
-            p = [p[b][x] for b in range(3)]
-            b = measure(p, eff, impl)
+            p_ = [p[b][x] for b in range(3)]
+            b = measure(p_, eff, impl)
             data.append((b,x))
-        
         if impl == '1' : 
             if badSource:
                 alphamax = np.percentile(np.abs(alphas), 99.9)
                 delta = exp(-abs(alphamax)**2/2)
             else:
                 delta = exp(-abs(alpha)**2/2)
-        else: 
+        elif impl == '2': 
             if badSource:
                 alphamax = np.percentile(np.abs(alphas), 99.9)
                 delta = exp(-abs(alphamax)**2)
             else:
                 delta = exp(-abs(alpha)**2)
+        else:
+            if badSource:
+                alphamax = np.percentile(np.abs(alphas), 99.9)
+                delta = exp(-2*abs(alphamax)**2)
+            else:
+                delta = exp(-2*abs(alpha)**2)
 
         probs = get_stat(data, impl, deadtime)
 
