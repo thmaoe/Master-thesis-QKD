@@ -12,3 +12,9 @@
 ### HminLower.py contains code to compute the lower bound on Hmin
 - just use getHmin(p, delta, px), if want to consider 3 outputs (b instead of c), use the one from HminLowerb.py
 
+### ShannonEAT.py containts code to compute lower bound on smooth min entropy with EAT
+- getH3(ps, N, lambdas, Rs, cm, nB=3): gives the EAT lower bound. It needs a list of probas p(b|x), the number of points, Lagrange multiplier from the Dual and the BFF constant.
+
+### GraamBFF4.py containts code to compute Shannon lower bound using combination of Graam and BFF.
+- runSDP(p, delta, px): gives this lower bound. Can modify the m parameter from BFF directly in this function.
+
