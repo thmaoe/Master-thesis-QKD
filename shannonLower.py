@@ -1,4 +1,5 @@
 ##Function to compute lower bound on Shannon entropy
+## impl 0 = normal; impl = 1 adding y input to Bob
 
 import cvxpy as cp
 import numpy as np
@@ -31,28 +32,7 @@ def getMatricesFaster(xs, asize, bs, impl=0, ys=2): #Faster version -- better to
 
         return Mbs, Xis, Thetas
     
-    elif impl==1:
-        Mbs = {}
-
-        for i in range(bs):
-            Mbs[i] = cp.Variable((3,3), complex=True) ##we have only 2 inputs so we in dimension 2
-
-        Xis = {}
-
-        for b in range(bs):
-            Xis[b] = {}
-            for bb in range(bs):
-                Xis[b][bb] = cp.Variable((3,3), complex = True)
-
-        Thetas = {}
-        for b in range(bs):
-            Thetas[b] = {}
-            for bb in range(bs):
-                Thetas[b][bb] = cp.Variable((3,3), complex = True) 
-
-        return Mbs, Xis, Thetas
-    
-    else:
+    else: #adding y input to Bob
         Mbs = {}
 
         for i in range(bs):
@@ -113,32 +93,6 @@ def getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, asize, bs, impl=0, ys=2):
         
         return constraints
     
-    elif impl==1:
-        constraints = []
-
-        sumb_m = 0.0
-        for bb in range(bs):
-            sumb_m += Mbs[bb]
-            sumb_xi = 0.0
-            sumb_theta = 0.0
-            for b in range(bs):
-                sumb_xi += Xis[b][bb]
-                sumb_theta += Thetas[b][bb]
-                G = cp.bmat([[Mbs[b],           Xis[b][bb]], 
-                            [Xis[b][bb], Thetas[b][bb]]])
-                constraints += [G >> 0.0]
-
-            
-            constraints += [sumb_xi == cp.trace(sumb_xi) * np.eye(3) / float(3)]
-            constraints += [sumb_theta == cp.trace(sumb_theta) * np.eye(3) / float(3)]
-        
-        constraints += [sumb_m == np.identity(3)]
-                
-        for b in range(bs):
-            for x in range(xs):
-                constraints += [cp.trace(Mbs[b] @ rho[x]) == p[b][x]]
-        
-        return constraints
     else:
         constraints = []
 
@@ -172,7 +126,7 @@ def getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, asize, bs, impl=0, ys=2):
         return constraints
         
 
-def getHFaster(m, xs, asize, bs, p, rho, w, t, px, c, impl = 0, ys=2):
+def getHFaster(m, xs, asize, bs, p, rho, w, t, px, impl = 0, ys=2):
     if impl == 0:
 
         obj = 0.0
@@ -186,7 +140,7 @@ def getHFaster(m, xs, asize, bs, p, rho, w, t, px, c, impl = 0, ys=2):
                 for bb in range(bs):
                     sumbb0 += Thetas[bb][0][a]
                     sumbb1 += Thetas[bb][1][a]
-                if asize == 2 and c==0:
+                if asize == 2:
                     if a == 0:
                         Xisa0a = Xis[0][0][a] + Xis[1][0][a]
                         Thetaa0a = Thetas[0][0][a] + Thetas[1][0][a]
@@ -217,32 +171,6 @@ def getHFaster(m, xs, asize, bs, p, rho, w, t, px, c, impl = 0, ys=2):
             cm += w[i]/(t[i]*np.log(2))
 
         obj += cm
-        return obj
-    
-    elif impl == 1:
-        obj = 0.0
-        for i in range(m):
-            Mbs, Xis, Thetas = getMatricesFaster(xs, bs, impl=1)
-            constraints = getConstraintsFaster(Mbs, Xis, Thetas, rho, p, xs, bs, impl=1)
-            sumb = 0.0
-            for b in range(bs):
-                sumbb = 0.0
-                for bb in range(bs):
-                    sumbb += Thetas[bb][b]
-                sumb += cp.real(cp.trace(rho[2] @ (2*Xis[b][b] + (1 - t[i]) * Thetas[b][b] + t[i]*sumbb)))
-            subObj = sumb * (w[i]/(t[i]*np.log(2)))
-
-            prob = cp.Problem(cp.Minimize(subObj), constraints)
-            prob.solve(solver='MOSEK',verbose=False)
-            obj += prob.value
-
-        cm = 0.0
-
-        for i in range(m):
-            cm += w[i]/(t[i]*np.log(2))
-
-        obj += cm
-
         return obj
 
     else:
@@ -393,46 +321,22 @@ def getHDual(delta, p, px):
 
     return H, Lambdas, Rs, cm
 
-def runOpti(delta, p, px, asize = 3, c = 0, impl = 0, ys=2): ##don't use c=1, was a trial
-    if c==1:
-        p = {0: {0: p[0][0] + p[1][0], 1: p[0][1] + p[1][1]}, 1: {0: p[2][0], 1: p[2][1]}}
-    if impl == 0 or impl==3:
-        rho0 = np.array([[1.,0],[0,0]])
-        rho1 = np.array([[delta**2, delta*np.sqrt(1-delta**2)], 
-                        [delta*np.sqrt(1-delta**2), 1-delta**2]])
-        rho1 = rho1 / np.trace(rho1) #bc of floating errors
+def runOpti(delta, p, px, asize = 3, impl = 0, ys=2): 
 
-        rho = {0: rho0, 1: rho1}
+    rho0 = np.array([[1.,0],[0,0]])
+    rho1 = np.array([[delta**2, delta*np.sqrt(1-delta**2)], 
+                    [delta*np.sqrt(1-delta**2), 1-delta**2]])
+    rho1 = rho1 / np.trace(rho1) #bc of floating errors
 
-        m_in = 4
-        m = int(m_in*2)
-        distribution = chaospy.Uniform(lower=0, upper=1)
-        t, w = chaospy.quadrature.radau(m_in,distribution,1.0)
-        t = t[0]
-        xs = len(p[0])
-        bs = len(p)
+    rho = {0: rho0, 1: rho1}
 
-        return getHFaster(m, xs, asize, bs, p, rho, w, t, px, c, impl, ys)
-    
-    else:
-        a = np.abs((delta[1]+delta[2])/np.sqrt(2.0*(1.0+delta[0])))**2.0 + np.abs((delta[1]-delta[2])/np.sqrt(2.0*(1.0-delta[0])))**2.0
-        if a >= 1.0:
-            a = 1.0
-        if a <= 0.0:
-            a = 0.0
-        rho0 = np.array([[np.sqrt((1+delta[0])/2)], [np.sqrt((1-delta[0])/2)], [0.0]]) @ np.array([[np.sqrt((1+delta[0])/2), np.sqrt((1-delta[0])/2), 0.0]])
-        rho1 = np.array([[np.sqrt((1+delta[0])/2)], [-np.sqrt((1-delta[0])/2)], [0.0]]) @ np.array([[np.sqrt((1+delta[0])/2), -np.sqrt((1-delta[0])/2), 0.0]])
-        rho2 = np.array([[(delta[1] + delta[2])/np.sqrt(2*(1+delta[0]))], [(delta[1]-delta[2])/np.sqrt(2*(1-delta[0]))], [np.sqrt(1.0-a)]]) @ np.array([[(delta[1] + delta[2])/np.sqrt(2*(1+delta[0])), (delta[1]-delta[2])/np.sqrt(2*(1-delta[0])), np.sqrt(1.0-a)]])
+    m_in = 4
+    m = int(m_in*2)
+    distribution = chaospy.Uniform(lower=0, upper=1)
+    t, w = chaospy.quadrature.radau(m_in,distribution,1.0)
+    t = t[0]
+    xs = len(p[0])
+    bs = len(p)
 
-        rho = {0: rho0, 1: rho1, 2: rho2}
-
-        m_in = 4
-        m = int(m_in*2)
-        distribution = chaospy.Uniform(lower=0, upper=1)
-        t, w = chaospy.quadrature.radau(m_in,distribution,1.0)
-        t = t[0]
-        xs = 3
-        bs = 3
-
-        return getHFaster(m, xs, bs, p, rho, w, t, px, impl)
+    return getHFaster(m, xs, asize, bs, p, rho, w, t, px, impl, ys)
     
